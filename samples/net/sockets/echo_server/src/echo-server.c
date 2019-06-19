@@ -45,7 +45,8 @@ static void init_app(void)
 	LOG_INF(APP_BANNER);
 
 #if defined(CONFIG_NET_SOCKETS_SOCKOPT_TLS)
-	int err = tls_credential_add(SERVER_CERTIFICATE_TAG,
+    int err;
+	err = tls_credential_add(SERVER_CERTIFICATE_TAG,
 				     TLS_CREDENTIAL_SERVER_CERTIFICATE,
 				     server_certificate,
 				     sizeof(server_certificate));
@@ -57,6 +58,22 @@ static void init_app(void)
 	err = tls_credential_add(SERVER_CERTIFICATE_TAG,
 				 TLS_CREDENTIAL_PRIVATE_KEY,
 				 private_key, sizeof(private_key));
+	if (err < 0) {
+		LOG_ERR("Failed to register private key: %d", err);
+	}
+
+	err = tls_credential_add(RSA_SERVER_CERTIFICATE_TAG,
+				     TLS_CREDENTIAL_SERVER_CERTIFICATE,
+				     rsa_server_certificate,
+				     sizeof(rsa_server_certificate));
+	if (err < 0) {
+		LOG_ERR("Failed to register public certificate: %d", err);
+	}
+
+
+	err = tls_credential_add(RSA_SERVER_CERTIFICATE_TAG,
+				 TLS_CREDENTIAL_PRIVATE_KEY,
+				 rsa_private_key, sizeof(rsa_private_key));
 	if (err < 0) {
 		LOG_ERR("Failed to register private key: %d", err);
 	}

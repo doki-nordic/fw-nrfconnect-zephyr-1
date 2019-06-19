@@ -131,10 +131,13 @@ struct tls_context {
 	mbedtls_x509_crt ca_chain;
 
 	/** mbedTLS structure for own certificate. */
-	mbedtls_x509_crt own_cert;
+	mbedtls_x509_crt own_cert[CONFIG_TLS_MAX_OWN_CERTIFICATES_NUMBER];
 
 	/** mbedTLS structure for own private key. */
-	mbedtls_pk_context priv_key;
+	mbedtls_pk_context priv_key[CONFIG_TLS_MAX_OWN_CERTIFICATES_NUMBER];
+
+	/** TODO: comment */
+	u32_t own_cert_count;
 #endif /* MBEDTLS_X509_CRT_PARSE_C */
 
 #endif /* CONFIG_MBEDTLS */
@@ -351,8 +354,6 @@ static struct tls_context *tls_alloc(void)
 #endif
 #if defined(MBEDTLS_X509_CRT_PARSE_C)
 		mbedtls_x509_crt_init(&tls->ca_chain);
-		mbedtls_x509_crt_init(&tls->own_cert);
-		mbedtls_pk_init(&tls->priv_key);
 #endif
 
 #if defined(MBEDTLS_DEBUG_C) && (CONFIG_NET_SOCKETS_LOG_LEVEL >= LOG_LEVEL_DBG)
@@ -410,8 +411,11 @@ static int tls_release(struct tls_context *tls)
 	mbedtls_ssl_free(&tls->ssl);
 #if defined(MBEDTLS_X509_CRT_PARSE_C)
 	mbedtls_x509_crt_free(&tls->ca_chain);
-	mbedtls_x509_crt_free(&tls->own_cert);
-	mbedtls_pk_free(&tls->priv_key);
+	int i;
+	for (i = 0; i < tls->own_cert_count; i++) {
+		mbedtls_x509_crt_free(&tls->own_cert[i]);
+		mbedtls_pk_free(&tls->priv_key[i]);
+	}
 #endif
 
 	tls->is_used = false;
@@ -639,25 +643,46 @@ static int tls_set_own_cert(struct tls_context *tls,
 			    struct tls_credential *priv_key)
 {
 #if defined(MBEDTLS_X509_CRT_PARSE_C)
-	int err = mbedtls_x509_crt_parse(&tls->own_cert,
+	if (tls->own_cert_count >= CONFIG_TLS_MAX_OWN_CERTIFICATES_NUMBER)
+	{
+		return -ENOBUFS;
+	}
+
+	mbedtls_x509_crt_init(&tls->own_cert[tls->own_cert_count]);
+	mbedtls_pk_init(&tls->priv_key[tls->own_cert_count]);
+
+	int err = mbedtls_x509_crt_parse(&tls->own_cert[tls->own_cert_count],
 					 own_cert->buf, own_cert->len);
 	if (err != 0) {
-		return -EINVAL;
+		err = -EINVAL;
+		goto error;
 	}
 
-	err = mbedtls_pk_parse_key(&tls->priv_key, priv_key->buf,
+	err = mbedtls_pk_parse_key(&tls->priv_key[tls->own_cert_count], priv_key->buf,
 				   priv_key->len, NULL, 0);
 	if (err != 0) {
-		return -EINVAL;
+		err = -EINVAL;
+		goto error;
 	}
 
-	err = mbedtls_ssl_conf_own_cert(&tls->config, &tls->own_cert,
-					&tls->priv_key);
+	err = mbedtls_ssl_conf_own_cert(&tls->config,
+					&tls->own_cert[tls->own_cert_count],
+					&tls->priv_key[tls->own_cert_count]);
 	if (err != 0) {
 		err = -ENOMEM;
+		goto error;
 	}
 
-	return 0;
+	tls->own_cert_count++;
+
+error:
+	if (err != 0) {
+		mbedtls_x509_crt_free(&tls->own_cert[tls->own_cert_count]);
+		mbedtls_pk_free(&tls->priv_key[tls->own_cert_count]);
+	}
+
+	return err;
+
 #endif /* MBEDTLS_X509_CRT_PARSE_C */
 
 	return -ENOTSUP;
@@ -748,6 +773,7 @@ static int tls_mbedtls_set_credentials(struct tls_context *tls)
 			tag_found = true;
 
 			err = tls_set_credential(tls, cred);
+            printk("tls_set_credential tag=%d, type=%d\n", tag, cred->type);
 			if (err != 0) {
 				goto exit;
 			}
@@ -770,6 +796,7 @@ exit:
 		tls_set_ca_chain(tls);
 	}
 
+    printk("err %d\n", err);
 	return err;
 }
 

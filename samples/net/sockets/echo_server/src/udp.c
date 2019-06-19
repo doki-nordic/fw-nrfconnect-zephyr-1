@@ -51,6 +51,7 @@ static int start_udp_proto(struct data *data, struct sockaddr *bind_addr,
 #if defined(CONFIG_NET_SOCKETS_SOCKOPT_TLS)
 	sec_tag_t sec_tag_list[] = {
 		SERVER_CERTIFICATE_TAG,
+		RSA_SERVER_CERTIFICATE_TAG,
 	};
 	int role = 1;
 

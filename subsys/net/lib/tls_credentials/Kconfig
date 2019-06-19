@@ -17,6 +17,12 @@ config TLS_MAX_CREDENTIALS_NUMBER
 	help
 	  Maximum number of TLS credentials that can be registered.
 
+config TLS_MAX_OWN_CERTIFICATES_NUMBER
+	int "Maximum number of own TLS certificates"
+	default 1
+	help
+	  Maximum number of own TLS certificates that can be registered.
+
 config TLS_CREDENTIAL_FILENAMES
 	bool "Specify TLS credential filenames"
 	depends on NET_SOCKETS_OFFLOAD
